@@ -1,0 +1,59 @@
+version: "3.8"
+services:
+  db:
+    image: postgres:14
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_DB: users-api
+      POSTGRES_PASSWORD: password
+    volumes:
+      - db-volume:/var/lib/postgresql/data
+  auth-server:
+    depends_on:
+      - db
+    build:
+      context: authservice
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_NAME: users-api
+      DATABASE_PORT: 5432
+      DATABASE_HOST: db
+      DATABASE_USERNAME: root
+      DATABASE_PASSWORD: password
+    ports:
+      - "8083:8083"
+
+  rtmp-server:
+    build:
+      context: streamingservice
+      dockerfile: Dockerfile
+    #depends_on:
+    #  - db
+    environment:
+      - TRANSCODING_SERVER=http://transcode-server:8082
+      - AUTH_SERVER=http://auth-server:8083
+    ports:
+      - "1935:1935"
+  transcode-server:
+    build:
+      context: transcodingservice
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      - RTMP_SERVER=rtmp://rtmp-server:1935
+    volumes:
+      - stream-volume:/home/streams
+  content-server:
+    build:
+      context: contentservice
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    volumes:
+      - stream-volume:/home/streams
+volumes:
+  stream-volume:
+  db-volume:
